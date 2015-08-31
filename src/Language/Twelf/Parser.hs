@@ -185,7 +185,13 @@ sig = whiteSpace *> go
                                        ((TApp.) <$> (TApp <$> operator ident))
                                        (transAssoc assoc)))
                    DPrefix prec ident ->
-                       (insertOp ident prec (E.Prefix (TApp <$> operator ident)))
+                       (insertOp ident prec (prefix (TApp <$> operator ident)))
+                       where
+                         -- Parsec's buildExpressionParser does not support repeated
+                         -- occurrences of the same prefix operator. Chain together
+                         -- such occurrences such that buildExpressionParser sees them
+                         -- as a single operator.
+                         prefix p = E.Prefix (chainl1 p (return (.)))
                    DPostfix prec ident ->
                        (insertOp ident prec (E.Postfix (TApp <$> operator ident)))
                    DName c n -> insertNameDecl c n
