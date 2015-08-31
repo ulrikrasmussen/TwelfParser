@@ -16,10 +16,13 @@ reconstructDecl d = (either (error . show) fst . parse) . T.pack <$> cmd
     where parse = parseDecl initParserState "stdin"
           cmd   = runTwelfCmd $ "readDecl\n" ++ show d ++ "\n"
 
-reconstruct :: (Functor m, MonadIO m, MonadMask m) => String -> Bool -> [Decl] -> m [Decl]
-reconstruct bin debug ds = withTwelfServer bin debug $ do
+reconstruct :: (MonadIO m, MonadMask m) => [Decl] -> TwelfMonadT m [Decl]
+reconstruct ds = do
+  printImplicit <- runTwelfCmd "get Print.implicit"
   _ <- runTwelfCmd "set Print.implicit true"
-  mapM reconstruct' ds
+  ds' <- mapM reconstruct' ds
+  _ <- runTwelfCmd $ "set Print.implicit " ++ printImplicit
+  return ds'
     where reconstruct' :: (Functor m, MonadIO m) => Decl -> TwelfMonadT m Decl
           reconstruct' d@(DDecl _ _)         = reconstructDecl d
           reconstruct' d@(DDefn _ _ _ _)     = reconstructDecl d

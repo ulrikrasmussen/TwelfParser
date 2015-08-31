@@ -3,10 +3,11 @@ module Language.Twelf.IntSyn where
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import qualified Data.Map as M
+
 import qualified Language.Twelf.AST as AST
 import           Language.Twelf.AST hiding (Mode(..), Decl, DDefn)
-
 import           Language.Twelf.Reconstruct
+import           Language.Twelf.TwelfServer
 
 type Var = String
 type TypeName = String
@@ -152,13 +153,11 @@ inferImplicitA t (A (as, p)) = A (map (f True) imps ++ map (f False) rest, p)
       (imps, rest) = splitAt (length as - termArity t) as
       f b (v, m, a) = (v, m {metaImplicit = b}, a)
 
-extract :: (MonadIO m, MonadMask m, Functor m) =>
-           String
-        -> Bool
-        -> [AST.Decl]
-        -> m (M.Map String Decl)
-extract twelfPath debug ds = do
-  ds' <- reconstruct twelfPath debug ds
+extract :: (MonadIO m, MonadMask m) =>
+           [AST.Decl]
+        -> TwelfMonadT m (M.Map String Decl)
+extract ds = do
+  ds' <- reconstruct ds
   return $ foldl extract' M.empty (zip ds ds')
       where
         extract' sig (DDecl n t, DDecl _ t')
@@ -170,7 +169,7 @@ extract twelfPath debug ds = do
                        M.insert n
                              (DConst n $ inferImplicitA t $ toType M.empty t')
                              sig
-        extract' sig d@(AST.DDefn _ n a _, AST.DDefn _ _ a' m') =
+        extract' sig (AST.DDefn _ n a _, AST.DDefn _ _ a' m') =
           M.insert n
             (DDefn n (inferImplicitA a $ toType M.empty a') (toTerm M.empty m'))
             sig

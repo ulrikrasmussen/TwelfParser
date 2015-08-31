@@ -3,6 +3,7 @@ module Language.Twelf.TwelfServer
        ( TwelfMonadT
        , withTwelfServer
        , runTwelfCmd
+       , runTwelfCmd'
        ) where
 
 import Control.Monad.Catch
@@ -39,6 +40,23 @@ runTwelfCmd cmd = do
   when debug $
     liftIO $ mapM_ (hPutStrLn stderr . ("> "++)) $ lines cmd
   liftIO $ liftM (intercalate "\n") getresp
+
+-- | Run a Twelf command and get the response regardless of whether the command
+-- succeeded or not. The boolean part of the result indicates success.
+runTwelfCmd' :: MonadIO m => String -> TwelfMonadT m (String, Bool)
+runTwelfCmd' cmd = do
+  twelfin <- asks twelfStdin
+  twelfout <- asks twelfStdout
+  let getresp = do
+        l <- hGetLine twelfout
+        case l of
+          "%% ABORT %%" -> return ([], False)
+          "%% OK %%"    -> return ([], True)
+          _ -> do (ls, status) <- getresp
+                  return (l:ls, status)
+  liftIO $ hPutStrLn twelfin $ cmd ++ "\n"
+  (ls, status) <- liftIO getresp
+  return (intercalate "\n" ls, status)
 
 startTwelfProcess :: MonadIO m => String
                   -> m (Handle, Handle, ProcessHandle)
