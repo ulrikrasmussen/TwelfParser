@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Language.Twelf.Parser
+                     , Language.Twelf.Lexer
                      , Language.Twelf.AST
                      , Language.Twelf.Reconstruct
                      , Language.Twelf.IntSyn
