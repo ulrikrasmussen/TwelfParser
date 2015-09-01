@@ -26,7 +26,6 @@ defMeta :: Meta
 defMeta = Meta False Unrestricted
 
 type Binding = (Maybe Var, Meta, A)
-type Arg = M
 
 isImplicit :: Binding -> Bool
 isImplicit (_, m, _) = metaImplicit m
@@ -34,11 +33,11 @@ isImplicit (_, m, _) = metaImplicit m
 defBinding :: Var -> A -> Binding
 defBinding v a = (if v == "_" then Nothing else Just v, defMeta, a)
 
-newtype K = K [Binding]         -- {v1:a1}{v2:a2} ... {vn:an} type
-newtype A = A ([Binding], P)    -- {v1:a1}{v2:a2} ... {vn:an} P
-newtype P = P (TypeName, [Arg]) -- a m1 m2 .. mn
-newtype M = M ([Binding], R)    -- [v1:a1][v2:a2]...[vn:an] R
-newtype R = R (Root, [Arg])     -- x m1 m2 .. mn
+data K = K [Binding]         -- {v1:a1}{v2:a2} ... {vn:an} type
+data A = A [Binding] P       -- {v1:a1}{v2:a2} ... {vn:an} P
+data P = P TypeName [M]      -- a m1 m2 .. mn
+data M = M [Binding] R       -- [v1:a1][v2:a2]...[vn:an] R
+data R = R Root [M]          -- x m1 m2 .. mn
 data Root = RVar Var A
           | RConst ConstName
 
@@ -61,16 +60,16 @@ instance Show K where
     show (K bs) = concatMap (showBinding True) bs ++ "type"
 
 instance Show A where
-    show (A (bs, p)) = concatMap (showBinding True) bs ++ show p
+    show (A bs p) = concatMap (showBinding True) bs ++ show p
 
 instance Show P where
-    show (P (a, as)) = a ++ concatMap showArg as
+    show (P a as) = a ++ concatMap showArg as
 
 instance Show M where
-    show (M (bs, r)) = concatMap (showBinding False) bs ++ show r
+    show (M bs r) = concatMap (showBinding False) bs ++ show r
 
 instance Show R where
-    show (R (r, as)) = show r ++ concatMap showArg as
+    show (R r as) = show r ++ concatMap showArg as
 
 instance Show Root where
     show (RVar v a) = v ++ " : " ++ show a
@@ -99,38 +98,38 @@ toKind ctx (TPi v t1 t2) =
 toKind _ t = error $ "Invalid kind: " ++ show t
 
 toType :: Ctx -> Term -> A
-toType ctx (TArrow t1 t2) = let A (as', p) = toType ctx t2
-                            in A (defBinding "_" (toType ctx t1):as', p)
+toType ctx (TArrow t1 t2) = let A as' p = toType ctx t2
+                            in A (defBinding "_" (toType ctx t1):as') p
 toType ctx (TPi v t1 t2) =
     let t1' = toType ctx t1
-        A (as', p) = toType (M.insert v t1' ctx) t2
-    in A (defBinding v t1':as', p)
-toType ctx t = A ([], toAtomType ctx t)
+        A as' p = toType (M.insert v t1' ctx) t2
+    in A (defBinding v t1':as') p
+toType ctx t = A [] (toAtomType ctx t)
 
 toAtomType :: Ctx -> Term -> P
 toAtomType ctx (TConst c) = if M.member c ctx
                             then error $ "Unexpected variable '" ++ c
                                      ++ "'. Expected constant."
-                            else P (c, [])
-toAtomType ctx (TApp t1 t2) = let P (v, as) = toAtomType ctx t1
-                              in P (v, as ++ [toTerm ctx t2])
+                            else P c []
+toAtomType ctx (TApp t1 t2) = let P v as = toAtomType ctx t1
+                              in P v (as ++ [toTerm ctx t2])
 toAtomType _ t = error $ "Invalid atomic type: " ++ show t
 
 toTerm :: Ctx -> Term -> M
 toTerm ctx (TLam v t1 t2) =
     let t1' = toType ctx t1
-        M (as, r) = toTerm (M.insert v t1' ctx) t2
-    in M $ (defBinding v t1':as, r)
-toTerm ctx t = M ([], toAtomTerm ctx t)
+        M as r = toTerm (M.insert v t1' ctx) t2
+    in M (defBinding v t1':as) r
+toTerm ctx t = M [] (toAtomTerm ctx t)
 
 toAtomTerm :: Ctx -> Term -> R
-toAtomTerm ctx (TConst v) = R (maybe (RConst v) (RVar v) $ M.lookup v ctx, [])
+toAtomTerm ctx (TConst v) = R (maybe (RConst v) (RVar v) $ M.lookup v ctx) []
 toAtomTerm ctx (TVar v) = case M.lookup v ctx of
                             Nothing -> error $ "Unbound variable: " ++ v
-                            Just t -> R (RVar v t, [])
+                            Just t -> R (RVar v t) []
 toAtomTerm ctx (TApp t1 t2) =
-    let R (r, as) = toAtomTerm ctx t1
-    in R (r, as ++ [toTerm ctx t2])
+    let R r as = toAtomTerm ctx t1
+    in R r (as ++ [toTerm ctx t2])
 toAtomTerm _ t = error $ "Invalid atomic term: " ++ show t
 
 
@@ -148,7 +147,7 @@ inferImplicitK t (K as) = K $ map (f True) imps ++ map (f False) rest
       f b (v, m, a) = (v, m {metaImplicit = b}, a)
 
 inferImplicitA :: Term -> A -> A
-inferImplicitA t (A (as, p)) = A (map (f True) imps ++ map (f False) rest, p)
+inferImplicitA t (A as p) = A (map (f True) imps ++ map (f False) rest) p
     where
       (imps, rest) = splitAt (length as - termArity t) as
       f b (v, m, a) = (v, m {metaImplicit = b}, a)
