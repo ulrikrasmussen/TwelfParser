@@ -21,7 +21,8 @@ data TwelfProc = TwelfProc { twelfStdin :: Handle
                            , twelfDebug :: Bool }
 
 newtype TwelfMonadT m a = TwelfMonadT (ReaderT TwelfProc m a)
-    deriving (Functor, Applicative, Monad, MonadReader TwelfProc, MonadIO, MonadTrans)
+    deriving (Functor, Applicative, Monad, MonadReader TwelfProc, MonadIO, MonadTrans
+             ,MonadThrow, MonadCatch, MonadMask)
 
 runTwelfCmd :: MonadIO m => String -> TwelfMonadT m String
 runTwelfCmd cmd = do
