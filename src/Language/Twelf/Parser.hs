@@ -223,4 +223,4 @@ parseDecl :: ParserState
           -> SourceName
           -> T.Text
           -> Either ParseError (Decl, ParserState)
-parseDecl = runParser ((,) <$> (genExpParser *> decl) <*> getState)
+parseDecl = runParser ((,) <$> (genExpParser *> whiteSpace *> decl) <*> getState)
