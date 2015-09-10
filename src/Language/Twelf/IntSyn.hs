@@ -152,6 +152,12 @@ inferImplicitA t (A as p) = A (map (f True) imps ++ map (f False) rest) p
       (imps, rest) = splitAt (length as - termArity t) as
       f b (v, m, a) = (v, m {metaImplicit = b}, a)
 
+inferImplicitM :: Term -> M -> M
+inferImplicitM t (M as r) = M (map (f True) imps ++ map (f False) rest) r
+    where
+      (imps, rest) = splitAt (length as - termArity t) as
+      f b (v, m, a) = (v, m {metaImplicit = b}, a)
+
 extract :: (MonadIO m, MonadMask m) =>
            [AST.Decl]
         -> TwelfMonadT m (M.Map String Decl)
@@ -168,9 +174,10 @@ extract ds = do
                        M.insert n
                              (DConst n $ inferImplicitA t $ toType M.empty t')
                              sig
-        extract' sig (AST.DDefn _ n a _, AST.DDefn _ _ a' m') =
+        extract' sig (AST.DDefn _ n a m, AST.DDefn _ _ a' m') =
           M.insert n
-            (DDefn n (inferImplicitA a $ toType M.empty a') (toTerm M.empty m'))
+            (DDefn n (inferImplicitA a $ toType M.empty a')
+                     (inferImplicitM m $ toTerm M.empty m'))
             sig
         extract' sig (DMode a ms, _) =
             M.update (\(DFamily n (K as)) -> Just $ DFamily n (K $ zipWith aux as ms)) a sig
