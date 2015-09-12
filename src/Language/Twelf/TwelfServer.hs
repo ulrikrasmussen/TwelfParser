@@ -79,7 +79,10 @@ withTwelfServer :: (MonadIO m, MonadMask m) => String -> Bool -> TwelfMonadT m a
 withTwelfServer bin debug m =
   bracket
     (startTwelfProcess bin)
-    (\(_, _, pid) -> liftIO $ terminateProcess pid)
+    (\(stdin, _, pid) ->
+       liftIO $ do hPutStrLn stdin "quit\n"
+                   terminateProcess pid
+                   waitForProcess pid)
     (\(stdin, stdout, pid) ->
       runReaderT m'
         TwelfProc { twelfStdin  = stdin
