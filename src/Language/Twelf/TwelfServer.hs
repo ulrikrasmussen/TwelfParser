@@ -62,7 +62,7 @@ runTwelfCmd' cmd = do
 startTwelfProcess :: MonadIO m => String
                   -> m (Handle, Handle, ProcessHandle)
 startTwelfProcess bin = do
-  (Just stdin, Just stdout, _, pid) <-
+  (~(Just stdin), ~(Just stdout), _, pid) <-
     liftIO $ createProcess $ (proc bin [])
       { std_in    = CreatePipe
       , std_out   = CreatePipe

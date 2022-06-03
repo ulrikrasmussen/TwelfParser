@@ -18,7 +18,7 @@ where
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Text.PrettyPrint as PP
-import Text.PrettyPrint hiding (Mode)
+import Text.PrettyPrint hiding (Mode, (<>))
 
 type Ident = String
 data Term = TArrow Term Term
